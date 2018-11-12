@@ -18,3 +18,53 @@ df <- matrix(flatten_dbl(S),byrow = F,ncol = 100)
 matplot(x = df, y = 1:N, type = "s",col='black',
         xlim = c(0, time),
         main = "Homogeneous Poisson Process paths", xlab = "t", ylab = "N(t)")
+
+#Homgenoous Poisson Process - Method 2
+simulate_homogenous_poisson <- function(lambda,Time){
+  n <-1
+  t <- array()
+  t[n] <- 0
+  while(TRUE){
+    u <- runif(1)
+    w <- -1/lambda*log(u)
+    t[n+1] <- t[n] + w
+    if(t[n+1] > Time){
+      return(t) #return t 
+    }else{
+      n <- n + 1
+    }
+  }
+}
+
+plot(simulate_homogenous_poisson(1,10),type="s")
+
+#Inhomgoneous Poisson Process
+simulate_inhomogenous_poisson <- function(lambda,Time=10){
+  n <- 1
+  m <- 1
+  t <- array()
+  t[n] <- 0
+  s <- array()
+  s[m] <- 0
+  t_seq <- seq(from = 0.01,to = Time,by = 0.01)
+  lambda_bar <- max(lambda(t_seq))
+  while(s[m] < Time){
+    u <- runif(1)
+    w <- -1/lambda_bar*log(u)
+    s[m+1] <- s[m] + w
+    d <- runif(1)
+    if(d<= lambda(round(s[m+1],2))/lambda_bar){
+      t[n+1] <- s[m+1]
+      n <- n+1
+    }
+    m <- m + 1
+  }
+  t
+}
+
+Time <- 10
+
+lambda <- function(t){
+  1 + sin(t)
+}
+plot(simulate_inhomogenous_poisson(lambda,Time),type = 's')
