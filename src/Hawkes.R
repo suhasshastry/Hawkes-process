@@ -98,4 +98,5 @@ remove_cum_sum <- function(x){
   temp
 }
 
-plot(remove_cum_sum(hawkes(1,2,3,10)),type = 'l')
+plot(remove_cum_sum(hawkes(1,160,201,20)),type = 'l')
+
