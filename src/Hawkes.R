@@ -68,3 +68,34 @@ lambda <- function(t){
   1 + sin(t)
 }
 plot(simulate_inhomogenous_poisson(lambda,Time),type = 's')
+
+#Hawkes Process
+hawkes <- function(mu,alpha,beta,Time){
+  s <- 0
+  n <- 1
+  t <- array()
+  t[n] <- 0
+  while(s<Time){
+    lambda_bar <- mu + sum(alpha*exp(-beta*(s-t)))
+    u <- runif(1)
+    w <- -1/lambda_bar*log(u)
+    s <- s + w
+    d <- runif(1)
+    if(d*lambda_bar < mu + sum(alpha*exp(-beta*(s-t)))){
+      t[n] <- s
+      n <- n + 1
+    }
+  }
+  t
+}
+hawkes_data <- hawkes(1,2,3,10)
+remove_cum_sum <- function(x){
+  temp <- array()
+  temp[1] <- x[1]
+  for(i in 2:length(x)){
+    temp[i] = x[i]-x[i-1]
+  }
+  temp
+}
+
+plot(remove_cum_sum(hawkes(1,2,3,10)),type = 'l')
