@@ -4,7 +4,11 @@ time <- 5
 N <- qpois(1-1e-1, lambda = lambda * time)
 X <- rexp(n = N, rate = lambda)
 S <- c(0, cumsum(X))
-plot(x = S, y = 0:N, type = "s", xlim = c(0, time),xlab = 't',ylab = 'N(t)',main="Poisson process with rate=1") 
+plot(x = S, y = 0:N, type = "s", xlim = c(0, time),xlab = 't',ylab = 'N(t)',
+     main="Homogeneous Poisson process with rate=1")
+grid()
+abline(v = S,col="red",lty=2)
+
 
 #Homogeneous Poisson Process paths
 library(tidyverse)
@@ -65,9 +69,13 @@ simulate_inhomogenous_poisson <- function(lambda,Time=10){
 Time <- 10
 
 lambda <- function(t){
-  1 + sin(t)
+  0.5*t
 }
-plot(simulate_inhomogenous_poisson(lambda,Time),type = 's')
+t <- simulate_inhomogenous_poisson(lambda,Time)
+N <- length(t)
+plot(t,0:(N-1),type = 's',xlab='t',ylab='N(t)',
+     main="Inhomogoneous Poisson Process with rate=t/2")
+abline(v = t,col="red",lty=2)
 
 #Hawkes Process
 hawkes <- function(mu,alpha,beta,Time){
@@ -97,6 +105,24 @@ remove_cum_sum <- function(x){
   }
   temp
 }
+library(PtProcess)
+mpp(remove_cum_sum(hawkes(1,160,201,20)),simple_gif,marks=list(NULL, NULL),params = p <- c(0.02, 70.77, 0.47, 0.002, 1.25))
 
-plot(remove_cum_sum(hawkes(1,160,201,20)),type = 'l')
+
+# nro<-10
+# S<-vector(mode="integer",length = nro)
+# S[1]=0
+
+##Generation of Exponential random variables with parameter lambda
+S <- round(hawkes(1,2,3,10),2)
+
+#Plot of the trajectory and add lines in the arrival times
+n_func <- function(t, S) sapply(t, function(t) sum(S <= t))
+t_series <- seq(0, max(S), by = max(S)/100)
+S <- round(hawkes(1,2,3,10),2)
+plot(t_series, n_func(t_series, S),type = "s",
+ylab='N(t)',xlab="t",main="Hawkes Process, lambda = 1, alpha = 2, beta = 3")
+grid()
+abline(v = S,col="red",lty=2)
+
 
