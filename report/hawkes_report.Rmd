@@ -1,0 +1,239 @@
+---
+title: "Simulation of Hawkes Process"
+author: "Suhas Shastry"
+date: "11/29/2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(tidyverse)
+library(gridExtra)
+```
+
+```{r fig.height=2,echo=F}
+#1. Homogenous Poisson Process
+set.seed(3)
+lambda <- 1
+time <- 5
+N <- qpois(1-1e-1, lambda = lambda * time)
+X <- rexp(n = N, rate = lambda)
+S <- c(0, cumsum(X))
+df <- data.frame(s=S)
+plot1 <- ggplot(data=df) + 
+  geom_step(mapping = aes(x=s,y=0:N)) +
+  coord_cartesian(xlim = c(0, time),ylim=c(0,7)) +
+  theme_bw() +
+  geom_vline(xintercept = df$s,linetype="dashed", color = "red") +
+  labs(x='t',y=expression(N[t])) +
+  ggtitle('Homogeneous Poisson process with rate=1')
+```
+
+```{r fig.height=2,echo=F}
+#2. Inhomgoneous Poisson Process
+simulate_inhomogenous_poisson <- function(lambda,Time=10){
+  n <- 1
+  m <- 1
+  t <- array()
+  t[n] <- 0
+  s <- array()
+  s[m] <- 0
+  t_seq <- seq(from = 0.01,to = Time,by = 0.01)
+  lambda_bar <- max(lambda(t_seq))
+  while(s[m] < Time){
+    u <- runif(1)
+    w <- -1/lambda_bar*log(u)
+    s[m+1] <- s[m] + w
+    d <- runif(1)
+    if(d<= lambda(round(s[m+1],2))/lambda_bar){
+      t[n+1] <- s[m+1]
+      n <- n+1
+    }
+    m <- m + 1
+  }
+  t
+}
+
+Time1 <- 10
+
+lambda1 <- function(t){
+  0.5*t
+}
+set.seed(1)
+t1 <- simulate_inhomogenous_poisson(lambda1,Time1)
+N1 <- length(t1)
+# plot(t,0:(N-1),type = 's',xlab='t',ylab='N(t)',
+#      main="Inhomogoneous Poisson Process with rate=t/2")
+# abline(v = t,col="red",lty=2)
+df1 <- data.frame(s=t1)
+plot2 <- ggplot(data=df1) + 
+  geom_step(mapping = aes(x=s,y=0:(N1-1))) +
+  theme_bw() +
+  geom_vline(xintercept = df1$s,linetype="dashed", color = "red") +
+  labs(x='t',y=expression(N[t])) +
+  ggtitle('Inhomogoneous Poisson Process with rate=t/2')
+
+grid.arrange(plot1, plot2, ncol=2)
+```
+
+```{r fig.height=2,echo=F}
+hawkes <- function(mu,alpha,beta,Time){
+  s <- 0
+  n <- 1
+  t <- array()
+  t[n] <- 0
+  while(s<Time){
+    lambda_bar <- mu + sum(alpha*exp(-beta*(s-t)))
+    u <- runif(1)
+    w <- -1/lambda_bar*log(u)
+    s <- s + w
+    d <- runif(1)
+    if(d*lambda_bar < mu + sum(alpha*exp(-beta*(s-t)))){
+      t[n] <- s
+      n <- n + 1
+    }
+  }
+  t
+}
+set.seed(2)
+S <- round(hawkes(1,2,3,10),2)
+
+n_func <- function(t, S){
+ sapply(t, function(t) sum(S <= t)) 
+}
+t_series <- seq(0, max(S), by = max(S)/100)
+S <- round(hawkes(1,2,3,10),2)
+# plot(t_series, n_func(t_series, S),type = "s",
+#      ylab='N(t)',xlab="t",main="Hawkes Process, lambda = 1, alpha = 2, beta = 3")
+# grid()
+# abline(v = S,col="red",lty=2)
+df <- data.frame(x=t_series,y=n_func(t_series, S))
+ggplot(data=df) + 
+  geom_step(mapping = aes(x=x,y=y)) +
+  theme_bw() +
+  coord_cartesian(xlim = c(0, 10)) +
+  geom_vline(xintercept = S,linetype="dashed", color = "red") +
+  labs(x='t',y=expression(N[t])) +
+  ggtitle('Hawkes Process with lambda = 1, alpha = 2, beta = 3')
+```
+
+```{r echo=F}
+# MLE optimization
+
+loglikelihood_1 <- function(t,init_params){
+  lambda <- init_params[1]
+  alpha <- init_params[2]
+  beta <- init_params[3]
+  t_i <- tail(t,1)
+  #print(t)
+  #print(init_params)
+  temp<- log(lambda + alpha*(sum(exp(-beta*(t_i-t)))-1))
+  #print(paste(temp,'\n\n'))
+  temp
+}
+
+loglikelihood_2 <- function(t,init_params){
+  lambda <- init_params[1]
+  alpha <- init_params[2]
+  beta <- init_params[3]
+  t_k <- tail(t,1)
+  -lambda*t_k + alpha/beta*sum(exp(-beta*(t_k-t))-1)
+}
+
+loglikelihood_11 <- function(t,init_params){
+  lambda <- init_params[1]
+  alpha <- init_params[2]
+  beta <- init_params[3]
+  A <- rep(0,length(t))
+  for(i in 2:length(t)) {
+    A[i] <- exp(-beta*(t[i]-t[i-1]))*(1+A[i-1])
+  }
+  sum(log(lambda+alpha*A))
+}
+
+hawkes_ll <- function(init_params,t){
+  n <- length(t)
+  #likelihood1 <- sum(map(1:n,~loglikelihood_11(t[1:.x],init_params))%>% flatten_dbl())
+  likelihood1 <- loglikelihood_11(t,init_params)
+  #likelihood2 <- sum(map(1:n,~loglikelihood_2(t[1:.x],init_params)) %>% flatten_dbl())
+  likelihood2 <- loglikelihood_2(t,init_params)
+  -1*(likelihood1 + likelihood2)
+}
+set.seed(10)
+t <- hawkes(10,20,30,10)
+
+(mle1 <- optim(par = c(9, 19, 29), 
+               fn = hawkes_ll, t=t, method = "L-BFGS-B",lower=c(0,0,0))$par)
+```
+
+```{r fig.height=4,echo=F}
+chic <- read.csv("/cloud/project/data/chic.csv", sep="")
+data <- chic$x
+S <- data
+t_series <- seq(0, max(S), by = max(S)/100)
+# plot(t_series, n_func(t_series, S),type = "s",
+#      ylab='N(t)',xlab="t",main="Chicago Burglary data in Beat 423 from 2017 to present")
+# grid()
+# abline(v = S,col="red",lty=2)
+# hist(S,100)
+
+df <- data.frame(x=t_series,y=n_func(t_series, S))
+plot1 <- ggplot(data=df) +
+  geom_step(mapping = aes(x=x,y=y)) +
+  theme_bw() +
+  coord_cartesian(xlim = c(0, 700)) +
+  geom_vline(xintercept = S,linetype="dashed", color = "red") +
+  labs(x='t',y=expression(N[t])) +
+  ggtitle('Chicago Burglary data in Beat 423 from 2017 to present')
+
+plot2 <- ggplot() + 
+  geom_histogram(mapping=aes(x=S),bins = 100) +
+  theme_bw() +
+  coord_cartesian(xlim = c(0, 700)) +
+  labs(x='t',y=expression(N[t])) +
+  ggtitle('Chicago Burglary data in Beat 423 from 2017 to present')
+grid.arrange(plot1, plot2, nrow=2)
+```
+
+```{r echo=F}
+(mle1 <- optim(par = c(.1,2,3), fn = hawkes_ll, t = data, method = "L-BFGS-B",lower=c(0,0,0))$par)
+```
+
+```{r echo=F}
+S <- hawkes(0.29168892, 0.04131991, 0.79237880,700)
+df <- data.frame(x=t_series,y=n_func(t_series, S))
+plot1 <- ggplot(data=df) +
+  geom_step(mapping = aes(x=x,y=y)) +
+  theme_bw() +
+  coord_cartesian(xlim = c(0, 700)) +
+  geom_vline(xintercept = S,linetype="dashed", color = "red") +
+  labs(x='t',y=expression(N[t])) +
+  ggtitle('Simulated Hawkes data with lambda = 0.29, alpha = 0.04,
+     beta = 0.79')
+
+plot2 <- ggplot() + 
+  geom_histogram(mapping=aes(x=S),bins = 100) +
+  theme_bw() +
+  coord_cartesian(xlim = c(0, 700)) +
+  labs(x='t',y=expression(N[t])) +
+  ggtitle('Simulated Hawkes data with lambda = 0.29, alpha = 0.04,
+     beta = 0.79')
+library(gridExtra)
+grid.arrange(plot1, plot2, nrow=2)
+```
+
+```{r fig.height=3,echo=F}
+# P values histogram
+set.seed(1)
+S <- rerun(1000,hawkes(0.29168892, 0.04131991, 0.79237880,700))
+p_value <- map(S,~ks.test(data,.x)$p.value) %>% flatten_dbl()
+# hist(p_value,20,main="Histogram of p value",xlab="p value")
+# abline(v=0.05,col="red",lty=2)
+ggplot() +
+  geom_histogram(mapping = aes(x=p_value),bins = 21) +
+  theme_bw() +
+  geom_vline(xintercept = 0.05,linetype="dashed", color = "red")
+mean(p_value<0.05)
+```
+
