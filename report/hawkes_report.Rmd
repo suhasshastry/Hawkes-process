@@ -2,7 +2,11 @@
 title: "Simulation of Hawkes Process"
 author: "Suhas Shastry"
 date: "11/29/2018"
-output: pdf_document
+graphics: yes
+output: 
+  pdf_document:
+  fig_caption: yes
+  header-includes: \usepackage{float}
 ---
 
 ```{r setup, include=FALSE}
@@ -11,8 +15,13 @@ library(ggplot2)
 library(tidyverse)
 library(gridExtra)
 ```
+\subsection{Poisson Process}
+Poisson process is an elementary counting process used to fit the stochastic data. This model in two variants has found myriads of applications. Simple homogeneous Poisson process defined by, $$P\{X(t) = n\} = e^{-\lambda t}\frac{(\lambda t)^n}{n!}~~~ n=0,1,2,\dots$$ has a fundamental role in queuing theory. The rate $\lambda$ is constant through out the time. Inhomogeneous Poisson process is an improved process where rate $\lambda$ varies with time $t$. It is defined by $$P\{X(t)=n \} = e^{-\Lambda(t)}\frac{(\Lambda(t))^n}{n!} ~~~n=0,1,2,\dots$$
+This process has applications from biology, ecology, chemistry to teletraffic engineering. Both the variants are plotted in Figure 1. Red dotted vertical line in the figure indicates the arrival of an event.
 
-```{r fig.height=2,echo=F}
+When stochastic data has clustered chunks, or if occurrence of an event invokes many other events immediately, modeling Poisson process would not be a good fit. In these scenarios, Hawkes process is an appropriate model.
+
+```{r fig.height=2,echo=F,fig.cap='Poisson Process',fig.scap="short", fig.align='center',fig.pos='h'}
 #1. Homogenous Poisson Process
 set.seed(3)
 lambda <- 1
@@ -27,10 +36,9 @@ plot1 <- ggplot(data=df) +
   theme_bw() +
   geom_vline(xintercept = df$s,linetype="dashed", color = "red") +
   labs(x='t',y=expression(N[t])) +
-  ggtitle('Homogeneous Poisson process with rate=1')
-```
+  ggtitle('HPP with rate=1') + 
+  theme(plot.title = element_text(size = 10, face = "bold"))
 
-```{r fig.height=2,echo=F}
 #2. Inhomgoneous Poisson Process
 simulate_inhomogenous_poisson <- function(lambda,Time=10){
   n <- 1
@@ -72,12 +80,18 @@ plot2 <- ggplot(data=df1) +
   theme_bw() +
   geom_vline(xintercept = df1$s,linetype="dashed", color = "red") +
   labs(x='t',y=expression(N[t])) +
-  ggtitle('Inhomogoneous Poisson Process with rate=t/2')
+  ggtitle('IHPP with rate=t/2') + 
+  theme(plot.title = element_text(size = 10, face = "bold"))
 
 grid.arrange(plot1, plot2, ncol=2)
 ```
 
-```{r fig.height=2,echo=F}
+\subsection{Hawkes Process}
+Hawkes process is a non-Markovian extension of Poisson process [1] which is used to model self-excitation process. Exponential decaying process is defined by
+$$ \Lambda(t) = \lambda_0 + \sum_{t_i<t}\alpha e^{-\beta(t-t_i)}$$
+where, $\lambda_0$ is a base rate of arrival process, $\alpha$ and $\beta$ are positive constants. This process is simulated using Thinning procedure defined by Ogata in [2]. Simulated Hawkes process is depicted in Figure 2. 
+
+```{r echo=F,fig.height=2,echo=F,fig.cap='Hawkes Process',fig.scap="short", ,fig.width=6,fig.align='center'}
 hawkes <- function(mu,alpha,beta,Time){
   s <- 0
   n <- 1
@@ -115,8 +129,14 @@ ggplot(data=df) +
   coord_cartesian(xlim = c(0, 10)) +
   geom_vline(xintercept = S,linetype="dashed", color = "red") +
   labs(x='t',y=expression(N[t])) +
-  ggtitle('Hawkes Process with lambda = 1, alpha = 2, beta = 3')
+  ggtitle('Hawkes Process with lambda = 1, alpha = 2, beta = 3') + 
+  theme(plot.title = element_text(size = 10, face = "bold"))
 ```
+
+Log-likelihood of this process is defined by,
+$$l=\sum_{i=1}^klog\bigg[\lambda_0 + \alpha \sum_{j=1}^{i-1}e^{-\beta(t_
+i-t_j)} \bigg] - \lambda_0t_k +\frac{\alpha}{\beta}\sum_{i=1}^k\bigg[e^{-\beta(t_k-t_i)}-1 \bigg] $$
+For the given data, parameters $\alpha$, $\beta$ and $\lambda_0$ are obtained by maximizing log-likelihood function. Hawkes process with parameters, $(\lambda_0 = 10,\alpha=20,\beta=30)$ was simulated and MLE equation was optimized in R. Below are the MLE estimates of the parameters.
 
 ```{r echo=F}
 # MLE optimization
@@ -167,7 +187,10 @@ t <- hawkes(10,20,30,10)
                fn = hawkes_ll, t=t, method = "L-BFGS-B",lower=c(0,0,0))$par)
 ```
 
-```{r fig.height=4,echo=F}
+\subsection{Application of Hawkes Process}
+Self-excitation of events happen in various real life scenarios. Earthquakes usually occur in clusters, where a mainshock immediately trigger many aftershocks. Hawkes process is applied to account immigration and births for population estimation. But recently, application of Hawkes process in modeling crime dataset has increased. Hence I choose, crime dataset on Burglary in Chicago city in the area Beat 423 during 2017-18. Plot of data, both arrival process and histogram are depicted in Figure 3.
+
+```{r echo=F,fig.height=3.5,echo=F,fig.cap='Chicago Burglary data',fig.scap="short", ,fig.width=6,fig.align='center',fig.pos='h'}
 chic <- read.csv("/cloud/project/data/chic.csv", sep="")
 data <- chic$x
 S <- data
@@ -185,22 +208,25 @@ plot1 <- ggplot(data=df) +
   coord_cartesian(xlim = c(0, 700)) +
   geom_vline(xintercept = S,linetype="dashed", color = "red") +
   labs(x='t',y=expression(N[t])) +
-  ggtitle('Chicago Burglary data in Beat 423 from 2017 to present')
+  ggtitle('Chicago Burglary data in Beat 423 from 2017 to present') + 
+  theme(plot.title = element_text(size = 10, face = "bold"))
 
 plot2 <- ggplot() + 
   geom_histogram(mapping=aes(x=S),bins = 100) +
   theme_bw() +
   coord_cartesian(xlim = c(0, 700)) +
-  labs(x='t',y=expression(N[t])) +
-  ggtitle('Chicago Burglary data in Beat 423 from 2017 to present')
+  labs(x='t',y=expression(N[t])) 
 grid.arrange(plot1, plot2, nrow=2)
 ```
 
+MLE estimators for above dataset are
 ```{r echo=F}
 (mle1 <- optim(par = c(.1,2,3), fn = hawkes_ll, t = data, method = "L-BFGS-B",lower=c(0,0,0))$par)
 ```
 
-```{r echo=F}
+Hawkes process was simualated with parameters $(\lambda_0 = 0.29,\alpha=0.04,\beta=0.79)$ and Figure 4. is the arrival process and histogram of the simulated process.
+
+```{r echo=F,fig.height=3.5,echo=F,fig.cap='Simlulated Hawkes process',fig.scap="short", ,fig.width=6,fig.align='center',fig.pos='h'}
 S <- hawkes(0.29168892, 0.04131991, 0.79237880,700)
 df <- data.frame(x=t_series,y=n_func(t_series, S))
 plot1 <- ggplot(data=df) +
@@ -210,20 +236,21 @@ plot1 <- ggplot(data=df) +
   geom_vline(xintercept = S,linetype="dashed", color = "red") +
   labs(x='t',y=expression(N[t])) +
   ggtitle('Simulated Hawkes data with lambda = 0.29, alpha = 0.04,
-     beta = 0.79')
+     beta = 0.79') + 
+  theme(plot.title = element_text(size = 10, face = "bold"))
 
 plot2 <- ggplot() + 
   geom_histogram(mapping=aes(x=S),bins = 100) +
   theme_bw() +
   coord_cartesian(xlim = c(0, 700)) +
-  labs(x='t',y=expression(N[t])) +
-  ggtitle('Simulated Hawkes data with lambda = 0.29, alpha = 0.04,
-     beta = 0.79')
+  labs(x='t',y=expression(N[t]))
 library(gridExtra)
 grid.arrange(plot1, plot2, nrow=2)
 ```
 
-```{r fig.height=3,echo=F}
+The histograms of Chicago dataset and simulated Hawkes process look similar. Hence Kolmogorov–Smirnov test was used to check the goodness of fit. Hawkes process with same parameters was simualated 1000 times and compared with Chicago burglary data set each time. Figure 5. depicts the histogram of p-values of 1000 KS test. Red dotted line indicates the mark $\alpha=0.05$.
+
+```{r fig.height=2,echo=F,fig.cap='p-values of KS-test',fig.scap="short", ,fig.width=6,fig.align='center',fig.pos='h'}
 # P values histogram
 set.seed(1)
 S <- rerun(1000,hawkes(0.29168892, 0.04131991, 0.79237880,700))
@@ -233,7 +260,19 @@ p_value <- map(S,~ks.test(data,.x)$p.value) %>% flatten_dbl()
 ggplot() +
   geom_histogram(mapping = aes(x=p_value),bins = 21) +
   theme_bw() +
-  geom_vline(xintercept = 0.05,linetype="dashed", color = "red")
+  geom_vline(xintercept = 0.05,linetype="dashed", color = "red")+ 
+  theme(plot.title = element_text(size = 10, face = "bold"))
+```
+
+Proportion of p-values less than the mark $\alpha=0.05$ is
+
+```{r}
 mean(p_value<0.05)
 ```
 
+As we rejected the null hypothesis only a fraction of times, we conclude that there is a strong evidence against the alternative hypothesis, "Chicago burglary data is not following Hawkes process". In other words, Hawkes process is not a bad fit for Chicago burglary data.
+
+\subsection{References}
+1. Patrick J. Laub, Thomas Taimre, Philip K. Pollett, Hawkes Process - https://arxiv.org/abs/1507.02822
+
+2. Y. Ogata, Journal of the American Statistical Association 83(401), 9 (1988)
